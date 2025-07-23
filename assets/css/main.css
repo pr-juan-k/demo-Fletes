@@ -7,8 +7,8 @@
   display: none;
 }
 #geocode-A-btn , #geocode-B-btn{
-  color: #f09209;
-  background-color: #4c3519;
+  color: #8a629d;
+  background-color: #2f2f3b;
 }
 
 
@@ -349,12 +349,12 @@ INICIO my stile
   border-color: #1e7e34;
 }
 .btn-info {
-  background-color: rgb(223 156 45 / 80%);
-  border-color: #9a2626;
+  background-color: rgb(42 40 118 / 60%);
+  border-color: #150ef3;
 }
 .btn-info:hover {
-  background-color: #9a2626;
-  border-color: #f3dd8d;
+  background-color: #6d67ca;
+  border-color: #032dff;
 }
 .results-map-container {
   width: 100%;
@@ -416,7 +416,7 @@ FIN my stile
   --background-color: #f1f5f4; /* Background color for the entire website, including individual sections */
   --default-color: #212529; /* Default color used for the majority of the text content across the entire website */
   --heading-color: #2d465e; /* Color for headings, subheadings and title throughout the website */
-  --accent-color: #9a2626; /* Accent color that represents your brand on the website. It's used for buttons, links, and other elements that need to stand out */
+  --accent-color: #335c8e; /* Accent color that represents your brand on the website. It's used for buttons, links, and other elements that need to stand out */
   --surface-color: #ffffff; /* The surface color is used as a background of boxed elements within sections, such as cards, icon boxes, or other elements that require a visual separation from the global background. */
   --contrast-color: #ffffff; /* Contrast color for text, ensuring readability against backgrounds of accent, heading, or default colors. */
 }
@@ -538,7 +538,7 @@ h6 {
 --------------------------------------------------------------*/
 .header {
   --background-color: rgba(255, 255, 255, 0);
-  --default-color: #ff0707;
+  --default-color: #c1cdd5;
   --heading-color: #8f4747;
   color: var(--default-color);
   background-color: var(--background-color);
@@ -565,7 +565,7 @@ h6 {
   font-size: 28px;
   margin: 0;
   font-weight: 600;
-  color: var(--heading-color);
+  color: #010101;
 }
 
 .scrolled .header {
@@ -575,7 +575,7 @@ h6 {
 /* Global Header on Scroll
 ------------------------------*/
 .scrolled .header {
-  --background-color: rgb(223 156 45 / 80%);
+  --background-color: rgb(59 87 184 / 80%);
 }
 
 /*--------------------------------------------------------------
