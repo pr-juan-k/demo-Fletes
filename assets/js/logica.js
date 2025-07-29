@@ -578,108 +578,114 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     // --- Nueva Versión de initializeMainAutocomplete ---
+  
+
+
     function initializeMainAutocomplete(inputId, containerId, latId, lngId, displayId) {
         const addressInput = document.getElementById(inputId);
         const suggestionsContainer = document.getElementById(containerId);
         const latInput = document.getElementById(latId);
         const lngInput = document.getElementById(lngId);
         const displayInput = document.getElementById(displayId);
-
+    
         let debounceTimeout;
-
+    
         addressInput.addEventListener('input', () => {
             clearTimeout(debounceTimeout);
             const query = addressInput.value.trim();
-
+    
             if (query.length < 3) {
                 suggestionsContainer.innerHTML = '';
                 return;
             }
-
+    
             debounceTimeout = setTimeout(async () => {
                 try {
-                    // Coordenadas aproximadas para el bounding box de San Miguel de Tucumán (Capital)
-                    const bBoxTucumanCapital = [-65.26, -26.86, -65.17, -26.75]; // Oeste, Sur, Este, Norte
-                    const countryCode = 'ar';
-                    const state = 'Tucumán';
-
-                    let combinedResults = [];
-
-                    // 1. Consulta para San Miguel de Tucumán (Capital)
-                    const urlCapital = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&bounded=1&viewbox=${bBoxTucumanCapital.join(',')}&city=San Miguel de Tucumán&countrycodes=${countryCode}`;
-                    const responseCapital = await fetch(urlCapital);
-                    const dataCapital = await responseCapital.json();
-
-                    const capitalResults = dataCapital.filter(place => 
-                        (place.address.city === 'San Miguel de Tucumán' || 
-                        place.address.town === 'San Miguel de Tucumán' ||
-                        (place.display_name && place.display_name.includes('San Miguel de Tucumán')))
-                        && (!place.address.suburb || place.address.road) // Intentar priorizar calles sobre barrios solos
-                    ).slice(0, 3); 
-
-                    combinedResults = [...capitalResults];
-
-                    // 2. Consulta para el resto de la Provincia de Tucumán
-                    const urlProvince = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}, ${state}, ${countryCode}&format=json&limit=7`;
-                    const responseProvince = await fetch(urlProvince);
-                    const dataProvince = await responseProvince.json();
-
-                    const otherProvinceResults = dataProvince.filter(place => {
-                        const isCapital = (place.address.city === 'San Miguel de Tucumán' || place.address.town === 'San Miguel de Tucumán');
-                        const alreadyInCombined = combinedResults.some(res => res.place_id === place.place_id);
-                        return !isCapital && !alreadyInCombined;
-                    }).slice(0, 4); 
-
-                    combinedResults = [...combinedResults, ...otherProvinceResults];
-
-                    suggestionsContainer.innerHTML = ''; 
-
-                    if (combinedResults.length === 0) {
-                        const noResultsItem = document.createElement('div');
-                        noResultsItem.className = 'list-group-item text-muted';
-                        noResultsItem.textContent = 'No se encontraron sugerencias.';
-                        suggestionsContainer.appendChild(noResultsItem);
-                        return;
-                    }
-
-                    // Mostrar las sugerencias combinadas (ahora formateadas)
-                    combinedResults.forEach(place => {
+                    // --- 1. CONSULTA A LA API ---
+                    const viewbox = "-65.324,-26.883,-65.166,-26.78";
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=15&viewbox=${viewbox}&bounded=1&addressdetails=1&countrycodes=ar`;
+                    
+                    const response = await fetch(url);
+                    const allResults = await response.json();
+    
+                    const uniqueResults = allResults.filter((place, index, self) =>
+                        place.place_id && index === self.findIndex(p => p.place_id === place.place_id)
+                    );
+    
+                    // --- 2. FILTRADO AVANZADO EN DOS PASOS ---
+    
+                    // --- PASO 2a: Filtro por Inclusión (Whitelist) ---
+                    const priorityTerms = ['departamento capital', 'san miguel de tucumán', 'tucumán'];
+                    const allowedResults = uniqueResults.filter(place => {
+                        const displayNameLower = (place.display_name || '').toLowerCase();
+                        return priorityTerms.some(term => displayNameLower.includes(term));
+                    });
+    
+                    // --- PASO 2b: Filtro por Exclusión (Blacklist) --- ✅ LÓGICA MEJORADA AQUÍ
+                    const excludedLocations = [
+                        'Municipio de Simoca','Municipio de Villa de Chicligasta', 'Municipio de Concepción', 'monteros','Municipio de Monteros', 'Departamento Leales', 'Municipio de Graneros','Barrio Oeste Norte', 'Municipio de Famaillá'
+                    ];
+                    const finalResults = allowedResults.filter(place => {
+                        // Revisamos las partes estructurales de la dirección para mayor precisión.
+                        const city = (place.address.city || '').toLowerCase();
+                        const town = (place.address.town || '').toLowerCase();
+                        const county = (place.address.county || '').toLowerCase(); // 'county' a veces es el departamento
+    
+                        const isExcluded = excludedLocations.some(term =>
+                            city.includes(term) ||
+                            town.includes(term) ||
+                            county.includes(term)
+                        );
+                        
+                        return !isExcluded; // Mantenemos el resultado solo si NO está excluido.
+                    });
+    
+    
+                    // --- 3. ORDENAMIENTO POR PRIORIDAD ---
+                    const getPriorityScore = (place) => {
+                        const name = (place.display_name || '').toLowerCase();
+                        if (name.includes('departamento capital')) return 3;
+                        if (name.includes('san miguel de tucumán')) return 2;
+                        if (name.includes('tucumán')) return 1;
+                        return 0;
+                    };
+    
+                    finalResults.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+    
+                    // --- 4. RENDERIZAR LAS SUGERENCIAS ---
+                    suggestionsContainer.innerHTML = '';
+                    finalResults.forEach(place => {
                         const item = document.createElement('a');
                         item.href = '#';
                         item.className = 'list-group-item list-group-item-action';
-                        // *** USAMOS LA NUEVA FUNCIÓN DE FORMATO AQUÍ PARA LAS SUGERENCIAS ***
-                        item.textContent = formatAddressForDisplay(place); 
-
+                        item.textContent = place.display_name;
+    
                         item.addEventListener('click', (e) => {
                             e.preventDefault();
-                            // *** USAMOS LA NUEVA FUNCIÓN DE FORMATO AQUÍ TAMBIÉN PARA EL CAMPO VISIBLE Y DISPLAY ***
-                            const formattedAddress = formatAddressForDisplay(place);
-                            addressInput.value = formattedAddress;
                             
+                            const selectedAddress = place.display_name;
+                            addressInput.value = selectedAddress;
+                            displayInput.value = selectedAddress;
                             latInput.value = parseFloat(place.lat);
                             lngInput.value = parseFloat(place.lon);
-                            
+    
                             const pointType = inputId === 'addressA-input' ? 'A' : 'B';
-                            confirmedPoints[pointType] = {
-                                lat: parseFloat(place.lat),
-                                lng: parseFloat(place.lon),
-                                address: formattedAddress // Guardar la dirección formateada
-                            };
-
-                            displayInput.value = formattedAddress; 
+                            if (window.confirmedPoints) {
+                               confirmedPoints[pointType] = { lat: parseFloat(place.lat), lng: parseFloat(place.lon), address: selectedAddress };
+                            }
                             
-                            suggestionsContainer.innerHTML = ''; 
+                            suggestionsContainer.innerHTML = '';
                         });
                         suggestionsContainer.appendChild(item);
                     });
-
+    
                 } catch (error) {
                     console.error('Error al obtener sugerencias:', error);
                     suggestionsContainer.innerHTML = '<div class="list-group-item text-danger">Error al cargar sugerencias.</div>';
                 }
             }, 350);
         });
-
+    
         document.addEventListener('click', function(event) {
             if (!addressInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
                 suggestionsContainer.innerHTML = '';
@@ -825,7 +831,7 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(debounceModalTimeout);
             const query = mapSearchInput.value.trim();
 
-            if (query.length < 3) {
+            if (query.length < 2) {
                 modalSuggestionsContainer.innerHTML = '';
                 return;
             }
