@@ -3,7 +3,7 @@
 // --- CONSTANTES DE CÁLCULO ---
 const TARIFA_MINIMA_VIAJE_CORTO = 12000;
 const FACTOR_CALCULO_KM = 2.2;
-const PRECIO_BASE_KM = 1300;
+const PRECIO_BASE_KM = 1600; // precio nafta
 const DESCUENTO_LARGA_DISTANCIA = 0.85; // -15% entre 7 a 15 kilometros
 
 const COSTO_AYUDA = 5000;
@@ -546,153 +546,213 @@ document.addEventListener('DOMContentLoaded', function() {
     hideMessages();
 
     // --- INICIO: Lógica de Autocompletado para Inputs Principales ---
-    // --- Función Auxiliar para Formatear Direcciones (VERSIÓN ESPECÍFICA SOLICITADA) ---
-    function formatAddressForDisplay(place) {
-        const parts = place.display_name.split(',');
-        let formattedParts = [];
+    // Asegúrate de que esta función auxiliar esté definida en un ámbito accesible
+// La hemos adaptado para que funcione bien con los resultados de Google Places
+function formatAddressForDisplay(placeResult, includeCityAndDept = true) { // Default a true para Google Maps para asegurar detalles
+    let formattedParts = [];
 
-        // Asegurarse de que tenemos suficientes partes antes de acceder a ellas
-        // display_name: "732, General Lamadrid, Barrio Sur, San Miguel de Tucumán, Departamento Capital, Tucumán, T4000, Argentina"
-        // Posiciones deseadas: [1] General Lamadrid, [0] 732, [3] San Miguel de Tucumán, [5] Tucumán
+    // Priorizamos los componentes de dirección de Google Places
+    // https://developers.google.com/maps/documentation/javascript/reference/places-service#PlaceResult
+    const addressComponents = placeResult.address_components || [];
+    let streetName = '';
+    let houseNumber = '';
+    let city = '';
+    let department = ''; // Equivalente a county en Nominatim
+    let state = '';
+    let country = '';
 
-        const streetName = parts[1] ? parts[1].trim() : '';
-        const houseNumber = parts[0] ? parts[0].trim() : '';
-        const city = parts[3] ? parts[3].trim() : '';
-        const province = parts[5] ? parts[5].trim() : '';
+    for (const component of addressComponents) {
+        if (component.types.includes('street_number')) {
+            houseNumber = component.long_name;
+        } else if (component.types.includes('route')) {
+            streetName = component.long_name;
+        } else if (component.types.includes('locality')) { // Ciudad
+            city = component.long_name;
+        } else if (component.types.includes('administrative_area_level_2')) { // Departamento/Condado
+            department = component.long_name;
+        } else if (component.types.includes('administrative_area_level_1')) { // Provincia/Estado
+            state = component.long_name;
+        } else if (component.types.includes('country')) {
+            country = component.long_name;
+        }
+    }
 
-        if (streetName) {
-            formattedParts.push(streetName);
+    if (streetName) {
+        formattedParts.push(streetName);
+    }
+    if (houseNumber) {
+        formattedParts.push(houseNumber);
+    }
+
+    // Añadir ciudad y departamento si se solicita o si no se pudo formar una dirección de calle
+    if (includeCityAndDept || formattedParts.length === 0) {
+        let locationDetails = [];
+
+        // Prioriza San Miguel de Tucumán
+        if (city.toLowerCase() === 'san miguel de tucumán') {
+            locationDetails.push('San Miguel de Tucumán');
+        } else if (city) {
+            locationDetails.push(city);
         }
-        if (houseNumber) {
-            formattedParts.push(houseNumber);
+
+        // Prioriza Departamento Capital (Google lo da como 'administrative_area_level_2')
+        if (department.toLowerCase() === 'departamento capital') {
+            if (!locationDetails.includes('Departamento Capital')) { // Evitar duplicados
+                locationDetails.push('Departamento Capital');
+            }
+        } else if (department) {
+            locationDetails.push(department);
         }
-        if (city) {
-            formattedParts.push(city);
+
+        if (state.toLowerCase() === 'tucumán' && !locationDetails.includes('Tucumán')) {
+            locationDetails.push('Tucumán');
         }
-        if (province) {
-            formattedParts.push(province);
+        if (country.toLowerCase() === 'argentina' && !locationDetails.includes('Argentina')) {
+             // locationDetails.push('Argentina'); // Generalmente no es necesario mostrar el país si ya estamos filtrando por ello
         }
         
-        return formattedParts.filter(p => p).join(', '); // Filtra elementos vacíos y une
+        if (locationDetails.length > 0) {
+            formattedParts = formattedParts.concat(locationDetails.filter(p => !formattedParts.includes(p)));
+        }
     }
-
-
-    // --- Nueva Versión de initializeMainAutocomplete ---
-  
-
-
-    function initializeMainAutocomplete(inputId, containerId, latId, lngId, displayId) {
-        const addressInput = document.getElementById(inputId);
-        const suggestionsContainer = document.getElementById(containerId);
-        const latInput = document.getElementById(latId);
-        const lngInput = document.getElementById(lngId);
-        const displayInput = document.getElementById(displayId);
     
-        let debounceTimeout;
+    // Si aún no hay partes formateadas, usamos formatted_address de Google Places como fallback
+    return formattedParts.filter(p => p).join(', ') || placeResult.formatted_address || 'Dirección sin formato';
+}
+
+
+// --- NUEVA Versión de initializeMainAutocomplete para Google Maps ---
+function initializeMainAutocomplete(inputId, containerId, latId, lngId, displayId) {
+    const addressInput = document.getElementById(inputId);
+    const suggestionsContainer = document.getElementById(containerId);
+    const latInput = document.getElementById(latId);
+    const lngInput = document.getElementById(lngId);
+    const displayInput = document.getElementById(displayId); // Este es el input oculto o display donde se guarda la dirección formateada.
+
+    // Inicializar el servicio de Autocomplete de Google Maps
+    // Restringimos la búsqueda a Argentina y establecemos un sesgo geográfico hacia Tucumán.
+    const autocompleteOptions = {
+        componentRestrictions: { country: 'ar' },
+        types: ['address'], // Sugerir principalmente direcciones
+        bounds: new google.maps.LatLngBounds(
+            new google.maps.LatLng(-26.883, -65.324), // Suroeste de Tucumán
+            new google.maps.LatLng(-26.78, -65.166)  // Noreste de Tucumán
+        ),
+        strictBounds: false // false permite sugerencias fuera del bound si son muy relevantes. true las restringe estrictamente.
+    };
     
-        addressInput.addEventListener('input', () => {
-            clearTimeout(debounceTimeout);
-            const query = addressInput.value.trim();
-    
-            if (query.length < 3) {
-                suggestionsContainer.innerHTML = '';
-                return;
+    // Creamos el objeto Autocomplete que se adjunta al input principal
+    const autocomplete = new google.maps.places.Autocomplete(addressInput, autocompleteOptions);
+
+    // No necesitamos el evento 'input' ni el debounce aquí, Google Maps lo maneja internamente.
+    // Solo escuchamos el evento 'place_changed'.
+    autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace(); // Obtiene los detalles completos del lugar seleccionado.
+
+        if (!place.geometry) {
+            // El usuario no seleccionó un lugar de las sugerencias,
+            // o el lugar seleccionado no tiene información geográfica.
+            console.log("No details available for input: '" + place.name + "'");
+            suggestionsContainer.innerHTML = ''; // Ocultar sugerencias si no se encontró nada válido
+            return;
+        }
+
+        // --- 1. FILTRADO ESTRICTO EN EL CLIENTE (MÁS AGRESIVO) ---
+        // Aunque Google Maps es mejor, mantendremos este filtro como una capa de seguridad.
+        // Google Places API proporciona address_components que son muy útiles aquí.
+
+        const addressComponents = place.address_components || [];
+        let city = '';
+        let department = ''; // administrative_area_level_2
+        let state = '';
+        let country = '';
+        let displayNameLower = (place.formatted_address || place.name || '').toLowerCase(); // Usar formatted_address para el display_name general
+
+        for (const component of addressComponents) {
+            if (component.types.includes('locality')) { // Ciudad
+                city = component.long_name.toLowerCase();
+            } else if (component.types.includes('administrative_area_level_2')) { // Departamento/Condado
+                department = component.long_name.toLowerCase();
+            } else if (component.types.includes('administrative_area_level_1')) { // Provincia/Estado
+                state = component.long_name.toLowerCase();
+            } else if (component.types.includes('country')) {
+                country = component.long_name.toLowerCase();
             }
-    
-            debounceTimeout = setTimeout(async () => {
-                try {
-                    // --- 1. CONSULTA A LA API ---
-                    const viewbox = "-65.324,-26.883,-65.166,-26.78";
-                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=15&viewbox=${viewbox}&bounded=1&addressdetails=1&countrycodes=ar`;
-                    
-                    const response = await fetch(url);
-                    const allResults = await response.json();
-    
-                    const uniqueResults = allResults.filter((place, index, self) =>
-                        place.place_id && index === self.findIndex(p => p.place_id === place.place_id)
-                    );
-    
-                    // --- 2. FILTRADO AVANZADO EN DOS PASOS ---
-    
-                    // --- PASO 2a: Filtro por Inclusión (Whitelist) ---
-                    const priorityTerms = ['departamento capital', 'san miguel de tucumán', 'tucumán'];
-                    const allowedResults = uniqueResults.filter(place => {
-                        const displayNameLower = (place.display_name || '').toLowerCase();
-                        return priorityTerms.some(term => displayNameLower.includes(term));
-                    });
-    
-                    // --- PASO 2b: Filtro por Exclusión (Blacklist) --- ✅ LÓGICA MEJORADA AQUÍ
-                    const excludedLocations = [
-                        'Municipio de Simoca','Municipio de Villa de Chicligasta', 'Municipio de Concepción', 'monteros','Municipio de Monteros', 'Departamento Leales', 'Municipio de Graneros','Barrio Oeste Norte', 'Municipio de Famaillá'
-                    ];
-                    const finalResults = allowedResults.filter(place => {
-                        // Revisamos las partes estructurales de la dirección para mayor precisión.
-                        const city = (place.address.city || '').toLowerCase();
-                        const town = (place.address.town || '').toLowerCase();
-                        const county = (place.address.county || '').toLowerCase(); // 'county' a veces es el departamento
-    
-                        const isExcluded = excludedLocations.some(term =>
-                            city.includes(term) ||
-                            town.includes(term) ||
-                            county.includes(term)
-                        );
-                        
-                        return !isExcluded; // Mantenemos el resultado solo si NO está excluido.
-                    });
-    
-    
-                    // --- 3. ORDENAMIENTO POR PRIORIDAD ---
-                    const getPriorityScore = (place) => {
-                        const name = (place.display_name || '').toLowerCase();
-                        if (name.includes('departamento capital')) return 3;
-                        if (name.includes('san miguel de tucumán')) return 2;
-                        if (name.includes('tucumán')) return 1;
-                        return 0;
-                    };
-    
-                    finalResults.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
-    
-                    // --- 4. RENDERIZAR LAS SUGERENCIAS ---
-                    suggestionsContainer.innerHTML = '';
-                    finalResults.forEach(place => {
-                        const item = document.createElement('a');
-                        item.href = '#';
-                        item.className = 'list-group-item list-group-item-action';
-                        item.textContent = place.display_name;
-    
-                        item.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            
-                            const selectedAddress = place.display_name;
-                            addressInput.value = selectedAddress;
-                            displayInput.value = selectedAddress;
-                            latInput.value = parseFloat(place.lat);
-                            lngInput.value = parseFloat(place.lon);
-    
-                            const pointType = inputId === 'addressA-input' ? 'A' : 'B';
-                            if (window.confirmedPoints) {
-                               confirmedPoints[pointType] = { lat: parseFloat(place.lat), lng: parseFloat(place.lon), address: selectedAddress };
-                            }
-                            
-                            suggestionsContainer.innerHTML = '';
-                        });
-                        suggestionsContainer.appendChild(item);
-                    });
-    
-                } catch (error) {
-                    console.error('Error al obtener sugerencias:', error);
-                    suggestionsContainer.innerHTML = '<div class="list-group-item text-danger">Error al cargar sugerencias.</div>';
-                }
-            }, 350);
-        });
-    
-        document.addEventListener('click', function(event) {
-            if (!addressInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
-                suggestionsContainer.innerHTML = '';
-            }
-        });
-    }
+        }
 
+        // Criterio de INCLUSIÓN: Debe ser de San Miguel de Tucumán O Departamento Capital
+        const isInTargetArea = 
+            city.includes('san miguel de tucumán') || 
+            department.includes('departamento capital') ||
+            displayNameLower.includes('san miguel de tucumán') ||
+            displayNameLower.includes('departamento capital');
+
+        // Criterio de EXCLUSIÓN: Lista de ubicaciones no deseadas
+        const excludedLocations = [
+            'simoca', 'villa de chicligasta', 'concepción', 'monteros',
+            'leales', 'graneros', 'barrio oeste norte', 'famaillá', 'lules',
+            'yerba buena', 'tafí viejo', 'lastenia', 'banda del río salí', 'burruyacú',
+            'san pablo', 'villa nougués', 'san javier', 'el manantial',
+            'aguilares', 'juan bautista alberdi', 'chicligasta' // Puedes añadir más si descubres que se cuelan
+        ];
+        
+        const isExcluded = excludedLocations.some(term =>
+            displayNameLower.includes(term) ||
+            city.includes(term) ||
+            department.includes(term)
+        );
+
+        // Asegurarse de que sea de Tucumán (provincia) y Argentina
+        const isTucumanArgentina = state.includes('tucumán') && country.includes('argentina');
+
+        // Solo procesar si el lugar cumple con nuestros criterios
+        if (isInTargetArea && !isExcluded && isTucumanArgentina) {
+            // --- ACTUALIZAR LOS CAMPOS ---
+            const selectedFormattedAddress = formatAddressForDisplay(place, true); // Formatear para display
+            
+            addressInput.value = selectedFormattedAddress; // El input visible
+            displayInput.value = selectedFormattedAddress; // El input de display/oculto
+            latInput.value = place.geometry.location.lat();
+            lngInput.value = place.geometry.location.lng();
+
+            // Actualizar confirmedPoints con la dirección formateada
+            const pointType = inputId === 'addressA-input' ? 'A' : 'B';
+            if (window.confirmedPoints) {
+                window.confirmedPoints[pointType] = { 
+                    lat: place.geometry.location.lat(), 
+                    lng: place.geometry.location.lng(), 
+                    address: selectedFormattedAddress // Usar la dirección formateada
+                };
+            }
+            // No es necesario vaciar suggestionsContainer aquí, Google Autocomplete lo hace automáticamente.
+
+        } else {
+            // Si el lugar seleccionado no cumple los filtros, limpiar el input y los datos.
+            addressInput.value = '';
+            displayInput.value = '';
+            latInput.value = '';
+            lngInput.value = '';
+            const pointType = inputId === 'addressA-input' ? 'A' : 'B';
+            if (window.confirmedPoints && window.confirmedPoints[pointType]) {
+                delete window.confirmedPoints[pointType]; // Limpiar si no cumple el filtro
+            }
+            console.warn("La dirección seleccionada no cumple los criterios de filtro y fue rechazada:", place.formatted_address || place.name);
+            // Opcional: mostrar un mensaje al usuario
+            // alert("Por favor, selecciona una dirección válida dentro de San Miguel de Tucumán o Departamento Capital.");
+        }
+    });
+
+    // Para el contenedor de sugerencias (suggestionsContainer), en el caso de Google Maps
+    // no lo llenamos nosotros con <a> tags. Google Maps genera sus propias sugerencias
+    // directamente debajo del input.
+    // Podrías usar este contenedor para otros propósitos o eliminarlo si solo dependes de Google Autocomplete.
+    // Si aún quieres un comportamiento similar a Nominatim (mostrar lista HTML personalizada),
+    // tendrías que usar el servicio Places Autocomplete (Service) en lugar del Widget (Autocomplete class),
+    // pero eso es más complejo y generalmente no es necesario con Google Maps.
+
+    // El evento 'click' fuera del input tampoco es necesario con Google Maps Autocomplete.
+    // La UI de Google maneja esto por sí misma.
+}
     initializeMainAutocomplete(
         'addressA-input', 
         'suggestions-A-container', 

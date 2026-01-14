@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Usuario</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 100px; background: #f4f7f6; }
+        h1 { color: #6f42c1; }
+        .btn-back { display: inline-block; margin-top: 20px; color: #6f42c1; text-decoration: none; border: 1px solid #6f42c1; padding: 10px 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1 id="welcome-msg">¡Bienvenido!</h1>
+    <p>Has ingresado correctamente a la App de Fletes-Ya.</p>
+    <a href="inicio.html" class="btn-back">Cerrar Sesión</a>
+
+    <script>
+        const nombre = localStorage.getItem('usuarioLogueado');
+        if (nombre) {
+            document.getElementById('welcome-msg').innerText = `¡Bienvenido, ${nombre}!`;
+        }
+    </script>
+</body>
+</html>

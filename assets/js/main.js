@@ -1,36 +1,76 @@
 /*
-Inicio mi JS   
+ Logica para enviar comentario para mejorar la app   
  */
+
 document.addEventListener('DOMContentLoaded', function() {
-  const params = new URLSearchParams(window.location.search);
-  const status = params.get('status');
-  const message = params.get('message');
-  const registerSection = document.getElementById('register-section'); // Asegúrate de que tu sección de registro tenga este ID
+  const feedbackForm = document.getElementById('whatsapp-feedback-form');
 
-  // Selectores para los mensajes dentro de la sección de registro
-  const successMessageDiv = registerSection ? registerSection.querySelector('.sent-message') : null;
-  const errorMessageDiv = registerSection ? registerSection.querySelector('.error-message') : null;
+  if (feedbackForm) {
+      feedbackForm.addEventListener('submit', function(e) {
+          e.preventDefault(); // Evita que la página se recargue
 
-  if (status === 'success_registro' && successMessageDiv) {
-      successMessageDiv.style.display = 'block';
-      // Desplazarse a la sección de registro para ver el mensaje
-      if (registerSection) {
-          registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      // Limpiar el parámetro de la URL después de mostrar el mensaje
-      history.replaceState({}, document.title, window.location.pathname);
-  } else if (status === 'error_registro' && errorMessageDiv) {
-      errorMessageDiv.innerText = message || 'Hubo un error al procesar tu registro.';
-      errorMessageDiv.style.display = 'block';
-      // Desplazarse a la sección de registro para ver el mensaje
-      if (registerSection) {
-          registerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      // Limpiar el parámetro de la URL después de mostrar el mensaje
-      history.replaceState({}, document.title, window.location.pathname);
+          // --- CONFIGURACIÓN ---
+          const telefono = "5493811234567"; // REEMPLAZA CON TU NÚMERO (Código de país + número sin el +)
+          // ---------------------
+
+          // Obtener valores de los campos
+          const nombre = document.getElementById('nombre').value;
+          const apellido = document.getElementById('apellido').value;
+          const comentario = document.getElementById('comentario').value;
+
+          // Armar el mensaje con formato (usando negritas de WhatsApp)
+          const mensaje = 
+              `*NUEVO COMENTARIO PARA MEJORAR APP*%0A` +
+              `--------------------------------%0A` +
+              `*Usuario:* ${nombre} ${apellido}%0A` +
+              `*Comentario:*%0A${comentario}%0A` +
+              `--------------------------------`;
+
+          // Crear el enlace final
+          const urlWhatsApp = `https://api.whatsapp.com/send?phone=${5493815088924}&text=${mensaje}`;
+
+          // Abrir en una nueva pestaña
+          window.open(urlWhatsApp, '_blank');
+      });
   }
 });
 
+/*
+Logica para cargar video instructivo de como usar la app
+*/ 
+const video = document.getElementById('tutorialVideo');
+
+function togglePlay() {
+    if (video.paused) {
+        video.play();
+        document.querySelector('.video-overlay-play').style.display = 'none';
+    } else {
+        video.pause();
+        document.querySelector('.video-overlay-play').style.display = 'flex';
+    }
+}
+
+function forwardVideo() {
+    video.currentTime += 10;
+}
+
+function rewindVideo() {
+    video.currentTime -= 10;
+}
+
+function fullscreenVideo() {
+    if (video.requestFullscreen) {
+        video.requestFullscreen();
+    } else if (video.webkitRequestFullscreen) { /* Safari */
+        video.webkitRequestFullscreen();
+    } else if (video.msRequestFullscreen) { /* IE11 */
+        video.msRequestFullscreen();
+    }
+}
+
+// Permitir clic sobre el video también
+video.addEventListener('click', togglePlay);
+document.getElementById('playBtn').addEventListener('click', togglePlay);
 
 // En tu logica.js
 const scrollTop = document.querySelector('#scroll-top');

@@ -1933,16 +1933,133 @@ section,
 }
 
 /*--------------------------------------------------------------
-# Testimonials Section
+# Estilo seccion de video como usar la app
 --------------------------------------------------------------*/
+/* Contenedor del celular */
+.iphone-mockup {
+    width: 280px; /* Ancho escalado */
+    height: 580px; /* Alto escalado (proporción iPhone 12 Pro) */
+    background: #000;
+    margin: 0 auto;
+    border-radius: 40px;
+    padding: 12px;
+    border: 8px solid #222;
+    position: relative;
+    overflow: hidden;
+}
 
+/* Pantalla del video */
+.iphone-mockup .screen {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    border-radius: 30px;
+    overflow: hidden;
+    position: relative;
+}
+
+.iphone-mockup video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Hace que el video llene la pantalla vertical */
+}
+
+/* Estilo de los números de pasos */
+.step-number {
+    background: var(--bs-primary);
+    color: white;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+/* Overlay de Play inicial */
+.video-overlay-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4rem;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    z-index: 2;
+}
 /*--------------------------------------------------------------
 # Stats Section
 --------------------------------------------------------------*/
 
 /*--------------------------------------------------------------
-# Recent News Section
+# Estilo para el bonton (Como usar la aplicacion)
 --------------------------------------------------------------*/
+/* Estilo del Botón Rectangular */
+.btn-rect-how {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 280px;            /* Ancho rectangular */
+  height: 85px;            /* Altura estilizada (no cuadrada) */
+  background: rgba(111, 66, 193, 0.12); /* Morado transparente */
+  border: 2px solid rgba(111, 66, 193, 0.3);
+  border-radius: 12px;
+  text-decoration: none !important;
+  backdrop-filter: blur(8px);      /* Efecto cristal */
+  transition: all 0.3s ease-in-out;
+  color: #ffffff;                  /* Color de marca morado */
+}
+
+/* Texto dentro del botón */
+.btn-rect-how .btn-text {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  margin-top: 8px;
+}
+
+/* Flechas con movimiento */
+.moving-arrows-down {
+  font-size: 1.5rem;
+  margin-top: -5px;
+  animation: arrowSlideDown 1.6s infinite;
+}
+
+/* Animación de flechas: aparecen arriba, bajan y desaparecen */
+@keyframes arrowSlideDown {
+  0% {
+      transform: translateY(-10px);
+      opacity: 0;
+  }
+  50% {
+      opacity: 1;
+  }
+  100% {
+      transform: translateY(10px);
+      opacity: 0;
+  }
+}
+
+/* Efecto Hover */
+.btn-rect-how:hover {
+  background: rgba(111, 66, 193, 0.9); /* Se vuelve sólido */
+  border-color: #6f42c1;
+  transform: translateY(3px);          /* Se mueve hacia abajo al pulsar */
+  color: #ffffff !important;           /* Texto a blanco */
+}
+
+.btn-rect-how:hover .moving-arrows-down {
+  color: #ffffff;
+}
+
+/* Asegura el scroll suave en toda la página */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px; 
+}
 
 /*--------------------------------------------------------------
 # Events Section
